@@ -152,8 +152,17 @@ class AssetSelector(ctk.CTkFrame):
         )
         self.error_label.grid(row=1, column=4, columnspan=3, sticky="w", pady=(8, 0))
         
-        # Выпадающий список результатов поиска (создается динамически)
-        self._create_search_results_frame()
+        # Фрейм для результатов поиска (всегда в структуре, но скрыт по умолчанию)
+        self.search_results_frame = ctk.CTkFrame(self, border_width=1, corner_radius=5)
+        self.search_results_frame.grid(row=2, column=0, columnspan=7, sticky="ew", pady=(5, 0))
+        self.search_results_frame.grid_remove()  # Скрываем по умолчанию
+        
+        # Прокручиваемый контейнер для результатов
+        self.search_results_scroll = ctk.CTkScrollableFrame(
+            self.search_results_frame,
+            height=120
+        )
+        self.search_results_scroll.pack(fill="both", expand=True, padx=5, pady=5)
     
     def _on_currency_change(self, value: str):
         """Обработчик изменения валюты"""
@@ -162,26 +171,9 @@ class AssetSelector(ctk.CTkFrame):
                 self.on_currency_change(currency)
                 break
     
-    def _create_search_results_frame(self):
-        """Создает выпадающий список результатов поиска"""
-        # Создаем фрейм для результатов (будет позиционироваться через place)
-        self.search_results_frame = ctk.CTkFrame(self, border_width=1, corner_radius=5)
-        self.search_results_frame.place_forget()  # Скрываем по умолчанию
-        
-        # Прокручиваемый контейнер для результатов
-        self.search_results_scroll = ctk.CTkScrollableFrame(
-            self.search_results_frame,
-            width=200,
-            height=150
-        )
-        self.search_results_scroll.pack(fill="both", expand=True, padx=2, pady=2)
-        
-        # Привязываем клик на фрейм результатов, чтобы он не скрывался при клике на него
-        self.search_results_frame.bind("<Button-1>", lambda e: "break")
-        self.search_results_scroll.bind("<Button-1>", lambda e: "break")
     
     def _show_search_results(self):
-        """Показывает выпадающий список результатов"""
+        """Показывает список результатов поиска"""
         if not self.search_results_frame:
             return
         
@@ -194,55 +186,37 @@ class AssetSelector(ctk.CTkFrame):
         for widget in self.search_results_scroll.winfo_children():
             widget.destroy()
         
+        # Добавляем заголовок
+        header_label = ctk.CTkLabel(
+            self.search_results_scroll,
+            text=f"Znalezione aktywy ({len(self.filtered_assets)}):",
+            font=ctk.CTkFont(size=11, weight="bold")
+        )
+        header_label.pack(pady=(0, 5))
+        
         # Добавляем кнопки для каждого найденного актива
         for asset in sorted(self.filtered_assets):
             btn = ctk.CTkButton(
                 self.search_results_scroll,
                 text=asset,
                 command=lambda a=asset: self._select_search_result(a),
-                width=190,
-                height=30,
+                height=32,
                 font=ctk.CTkFont(size=11),
                 anchor="w",
-                fg_color="transparent",
+                fg_color=("gray85", "gray25"),
                 text_color=("gray10", "gray90"),
                 hover_color=("gray70", "gray30")
             )
-            btn.pack(fill="x", padx=2, pady=1)
+            btn.pack(fill="x", padx=5, pady=2)
         
-        # Позиционируем и показываем список под полем поиска
-        self._position_search_results()
-        
-        # Поднимаем поверх других элементов
-        self.search_results_frame.lift()
-        
-        # Обновляем геометрию для правильного отображения
+        # Показываем фрейм
+        self.search_results_frame.grid()
         self.update_idletasks()
-    
-    def _position_search_results(self):
-        """Позиционирует выпадающий список под полем поиска"""
-        if not self.search_results_frame:
-            return
-        
-        # Обновляем геометрию для получения актуальных координат
-        self.update_idletasks()
-        
-        # Получаем координаты поля поиска относительно родительского виджета
-        search_x = self.search_entry.winfo_x()
-        search_y = self.search_entry.winfo_y()
-        search_height = self.search_entry.winfo_height()
-        
-        # Позиционируем под полем поиска
-        x = search_x
-        y = search_y + search_height + 2
-        
-        # Показываем фрейм с правильной позицией
-        self.search_results_frame.place(in_=self, x=x, y=y)
     
     def _hide_search_results(self):
-        """Скрывает выпадающий список результатов"""
+        """Скрывает список результатов"""
         if self.search_results_frame:
-            self.search_results_frame.place_forget()
+            self.search_results_frame.grid_remove()
     
     def _select_search_result(self, asset_name: str):
         """Обработчик выбора результата из списка поиска"""
@@ -287,30 +261,9 @@ class AssetSelector(ctk.CTkFrame):
     
     def _on_search_focus_out(self, event=None):
         """Обработчик потери фокуса полем поиска"""
-        # Проверяем, не кликнули ли мы на результаты поиска
-        if event and event.widget:
-            # Если клик был на фрейме результатов или его дочерних элементах, не скрываем
-            widget = event.widget
-            while widget:
-                if widget == self.search_results_frame:
-                    return  # Клик был на списке результатов, не скрываем
-                widget = widget.master
-        
-        # Увеличиваем задержку, чтобы клик по результату успел обработаться
-        self.after(200, self._check_and_hide_results)
-    
-    def _check_and_hide_results(self):
-        """Проверяет и скрывает результаты, если фокус не на поле поиска или списке"""
-        # Проверяем, есть ли фокус на поле поиска или списке результатов
-        focus_widget = self.focus_get()
-        if focus_widget != self.search_entry:
-            # Проверяем, не является ли виджет с фокусом частью списка результатов
-            widget = focus_widget
-            while widget:
-                if widget == self.search_results_frame:
-                    return  # Фокус на списке результатов, не скрываем
-                widget = widget.master if hasattr(widget, 'master') else None
-            self._hide_search_results()
+        # Не скрываем результаты при потере фокуса - они остаются видимыми
+        # Пользователь может кликнуть на результат в любое время
+        pass
     
     def _on_search_changed(self, event=None):
         """Обработчик изменения текста поиска"""
@@ -335,9 +288,8 @@ class AssetSelector(ctk.CTkFrame):
                     text=f"Znaleziono: {count}",
                     text_color=("gray50", "gray50")
                 )
-                # Показываем результаты если поле поиска в фокусе
-                if self.search_entry.focus_get() == self.search_entry:
-                    self._show_search_results()
+                # Показываем результаты
+                self._show_search_results()
         
         # Обновляем список в комбобоксе
         self._update_assets_list()
