@@ -52,7 +52,9 @@ class MainWindow(ctk.CTk):
         
         # Настройка grid для управления размерами
         main_container.grid_columnconfigure(0, weight=1)
-        main_container.grid_rowconfigure(3, weight=1, minsize=120)  # Таблица может изменять размер
+        # Убрали weight=1 для строки с таблицей, чтобы она не растягивалась
+        # minsize будет устанавливаться динамически в PurchaseTable
+        main_container.grid_rowconfigure(3, weight=0)
         
         # Верхняя панель: заголовок
         header = ctk.CTkLabel(
@@ -100,7 +102,7 @@ class MainWindow(ctk.CTk):
             on_delete=self._on_delete_purchase,
             currency=Currency.USD
         )
-        self.purchase_table.grid(row=3, column=0, pady=(0, 10), sticky="nsew")
+        self.purchase_table.grid(row=3, column=0, pady=(0, 10), sticky="ew")
         
         # Секция планирования
         self.planning_section = PlanningSection(
