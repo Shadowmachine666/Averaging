@@ -52,7 +52,7 @@ class MainWindow(ctk.CTk):
         
         # Настройка grid для управления размерами
         main_container.grid_columnconfigure(0, weight=1)
-        main_container.grid_rowconfigure(4, weight=1, minsize=120)  # Таблица может изменять размер
+        main_container.grid_rowconfigure(3, weight=1, minsize=120)  # Таблица может изменять размер
         
         # Верхняя панель: заголовок
         header = ctk.CTkLabel(
@@ -62,42 +62,21 @@ class MainWindow(ctk.CTk):
         )
         header.grid(row=0, column=0, sticky="w", pady=(0, 10))
         
-        # Селектор активов
+        # Селектор активов (включает выбор валюты)
         self.asset_selector = AssetSelector(
             main_container,
             on_asset_selected=self._on_asset_selected,
             on_asset_created=self._on_asset_created,
             on_asset_deleted=self._on_asset_deleted,
+            on_currency_change=self._on_currency_change,
             existing_assets=[],
             get_current_currency=lambda: self._get_current_currency_from_menu()
         )
         self.asset_selector.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         
-        # Верхняя панель: выбор валюты
-        top_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        top_frame.grid(row=2, column=0, sticky="ew", pady=(0, 10))
-        top_frame.grid_columnconfigure(0, weight=1)
-        
-        currency_label = ctk.CTkLabel(
-            top_frame,
-            text="Waluta:",
-            font=ctk.CTkFont(size=12)
-        )
-        currency_label.grid(row=0, column=0, padx=(0, 5), sticky="e")
-        
-        self.currency_menu = ctk.CTkOptionMenu(
-            top_frame,
-            values=[f"{c.symbol} ({c.code})" for c in Currency],
-            command=self._on_currency_change,
-            width=120,
-            font=ctk.CTkFont(size=11)
-        )
-        self.currency_menu.set(f"{Currency.USD.symbol} ({Currency.USD.code})")
-        self.currency_menu.grid(row=0, column=1, sticky="e")
-        
         # Горизонтальный контейнер для результатов и ввода
         results_input_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        results_input_frame.grid(row=3, column=0, pady=(0, 10), sticky="ew")
+        results_input_frame.grid(row=2, column=0, pady=(0, 10), sticky="ew")
         results_input_frame.grid_columnconfigure(0, weight=1)
         results_input_frame.grid_columnconfigure(1, weight=1)
         
@@ -121,7 +100,7 @@ class MainWindow(ctk.CTk):
             on_delete=self._on_delete_purchase,
             currency=Currency.USD
         )
-        self.purchase_table.grid(row=4, column=0, pady=(0, 10), sticky="nsew")
+        self.purchase_table.grid(row=3, column=0, pady=(0, 10), sticky="nsew")
         
         # Секция планирования
         self.planning_section = PlanningSection(
@@ -129,7 +108,7 @@ class MainWindow(ctk.CTk):
             on_drawdown_change=self._on_drawdown_change,
             currency=Currency.USD
         )
-        self.planning_section.grid(row=5, column=0, sticky="ew")
+        self.planning_section.grid(row=4, column=0, sticky="ew")
     
     def _on_asset_selected(self, asset_name: str):
         """Обработчик выбора актива"""
@@ -169,7 +148,7 @@ class MainWindow(ctk.CTk):
         """Загружает данные актива в интерфейс"""
         # Обновляем валюту
         currency = asset.currency
-        self.currency_menu.set(f"{currency.symbol} ({currency.code})")
+        self.asset_selector.set_currency(currency)
         
         # Обновляем процент просадки
         drawdown = asset.drawdown_percent
@@ -187,21 +166,17 @@ class MainWindow(ctk.CTk):
     
     def _get_current_currency_from_menu(self) -> Currency:
         """Возвращает текущую валюту из меню"""
-        value = self.currency_menu.get()
-        for currency in Currency:
-            if f"{currency.symbol} ({currency.code})" == value:
-                return currency
+        if hasattr(self, 'asset_selector'):
+            currency_menu = self.asset_selector.get_currency_menu()
+            if currency_menu:
+                value = currency_menu.get()
+                for currency in Currency:
+                    if f"{currency.symbol} ({currency.code})" == value:
+                        return currency
         return Currency.USD
     
-    def _on_currency_change(self, value: str):
+    def _on_currency_change(self, currency: Currency):
         """Обработчик изменения валюты"""
-        # Находим валюту по символу и коду
-        currency = Currency.USD
-        for c in Currency:
-            if f"{c.symbol} ({c.code})" == value:
-                currency = c
-                break
-        
         # Обновляем валюту в текущем активе
         if self.asset_manager.current_asset:
             self.asset_manager.set_currency(currency)
