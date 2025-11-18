@@ -154,15 +154,15 @@ class AssetSelector(ctk.CTkFrame):
         
         # Фрейм для результатов поиска (всегда в структуре, но скрыт по умолчанию)
         self.search_results_frame = ctk.CTkFrame(self, border_width=1, corner_radius=5)
-        self.search_results_frame.grid(row=2, column=0, columnspan=7, sticky="ew", pady=(5, 0))
+        # Используем sticky="ew" только для горизонтального растяжения, не для вертикального
+        self.search_results_frame.grid(row=2, column=0, columnspan=7, sticky="ew", pady=(2, 0))
         self.search_results_frame.grid_remove()  # Скрываем по умолчанию
+        # Настраиваем grid для фрейма, чтобы он не растягивался по вертикали
+        self.search_results_frame.grid_rowconfigure(0, weight=0)
+        self.search_results_frame.grid_columnconfigure(0, weight=1)
         
-        # Прокручиваемый контейнер для результатов
-        self.search_results_scroll = ctk.CTkScrollableFrame(
-            self.search_results_frame,
-            height=120
-        )
-        self.search_results_scroll.pack(fill="both", expand=True, padx=5, pady=5)
+        # Контейнер для результатов (будет ScrollableFrame или обычный Frame в зависимости от количества)
+        self.search_results_scroll = None  # Будет создан динамически
     
     def _on_currency_change(self, value: str):
         """Обработчик изменения валюты"""
@@ -182,35 +182,78 @@ class AssetSelector(ctk.CTkFrame):
             self._hide_search_results()
             return
         
+        # Удаляем старый контейнер, если он существует
+        if self.search_results_scroll:
+            self.search_results_scroll.destroy()
+        
+        num_results = len(self.filtered_assets)
+        
+        # Создаем контейнер в зависимости от количества результатов
+        if num_results <= 3:
+            # Для малого количества используем обычный Frame (без скролла)
+            self.search_results_scroll = ctk.CTkFrame(
+                self.search_results_frame,
+                fg_color="transparent"
+            )
+        else:
+            # Для большого количества используем ScrollableFrame со скроллом
+            self.search_results_scroll = ctk.CTkScrollableFrame(
+                self.search_results_frame,
+                height=60
+            )
+        
+        self.search_results_scroll.grid(row=0, column=0, sticky="ew", padx=2, pady=1)
+        
         # Очищаем предыдущие результаты
         for widget in self.search_results_scroll.winfo_children():
             widget.destroy()
         
-        # Добавляем заголовок
+        # Добавляем заголовок (компактный)
         header_label = ctk.CTkLabel(
             self.search_results_scroll,
             text=f"Znalezione aktywy ({len(self.filtered_assets)}):",
-            font=ctk.CTkFont(size=11, weight="bold")
+            font=ctk.CTkFont(size=9, weight="bold")
         )
-        header_label.pack(pady=(0, 5))
+        header_label.pack(pady=(0, 1))
         
-        # Добавляем кнопки для каждого найденного актива
+        # Добавляем кнопки для каждого найденного актива (компактные)
         for asset in sorted(self.filtered_assets):
             btn = ctk.CTkButton(
                 self.search_results_scroll,
                 text=asset,
                 command=lambda a=asset: self._select_search_result(a),
-                height=32,
-                font=ctk.CTkFont(size=11),
+                height=20,
+                font=ctk.CTkFont(size=10),
                 anchor="w",
                 fg_color=("gray85", "gray25"),
                 text_color=("gray10", "gray90"),
                 hover_color=("gray70", "gray30")
             )
-            btn.pack(fill="x", padx=5, pady=2)
+            btn.pack(fill="x", padx=2, pady=0.5)
+        
+        # Вычисляем требуемую высоту
+        if num_results <= 3:
+            # Высота подстраивается под содержимое (без скролла)
+            header_height = 15  # Заголовок + отступы
+            button_height = 21  # Высота кнопки + отступы
+            calculated_height = header_height + (button_height * num_results) + 2
+            frame_total_height = calculated_height + 4  # +4 для отступов фрейма
+        else:
+            # Фиксированная высота 60px со скроллом
+            frame_total_height = 60 + 4  # +4 для отступов фрейма
+        
+        # Ограничиваем высоту строки grid ПЕРЕД показом фрейма
+        self.grid_rowconfigure(2, minsize=frame_total_height, weight=0)
+        
+        # Ограничиваем высоту самого фрейма через его внутреннюю структуру
+        if num_results <= 3:
+            self.search_results_frame.grid_rowconfigure(0, minsize=calculated_height, weight=0)
+        else:
+            self.search_results_frame.grid_rowconfigure(0, minsize=60, weight=0)
         
         # Показываем фрейм
         self.search_results_frame.grid()
+        # Обновляем геометрию для правильного отображения
         self.update_idletasks()
     
     def _hide_search_results(self):
